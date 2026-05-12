@@ -702,11 +702,30 @@ window.addEventListener('hashchange',()=>{if(_user!==undefined)route();});
 onAuthStateChanged(auth,async user=>{
   _user=user;
   if(user){
-    try{_ud=await ensureUser(user);fillSB();}
-    catch(e){console.warn('user doc error',e);}
+    // Set _ud ngay từ auth để render không bị block
+    _ud={
+      displayName:user.displayName||user.email?.split('@')[0]||'?',
+      email:user.email||'',avatarUrl:user.photoURL||'',
+      xp:0,bookmarks:[],history:[],readChapters:{},completedStories:[],loginStreak:1
+    };
+    fillSB();
+    hideLoader();
+    route();
+    // Load Firestore data nền, xong thì update lại
+    try{
+      const fd=await ensureUser(user);
+      _ud=fd;
+      fillSB();
+      // Nếu đang ở profile thì render lại với data đầy đủ
+      const h=location.hash.slice(1)||'home';
+      const page=h.split('?')[0];
+      if(page==='profile'){renderPHero();renderRankRoad();renderPStats();renderPBm();renderPHist();renderPDone();}
+      if(page==='story'){const sid=new URLSearchParams(h.split('?')[1]||'').get('id');if(sid)renderStory(sid);}
+    }catch(e){console.warn('Firestore:',e);}
+  }else{
+    hideLoader();
+    route();
   }
-  hideLoader();
-  route();
 });
 
 window.doLogout=()=>signOut(auth).then(()=>window.nav('login'));
